@@ -17,9 +17,10 @@ energies = ["{0:0.1f}".format(16.0 + i/10) for i in range(1)]
 
 def MakeCondorSubmission(inputDir, outputDir, subfile):
 
-  if not os.path.isdir("/scratch/{}/log.log".format(whoami)):
+  if not os.path.isdir("/scratch/{}".format(whoami)):
     print("Please ensure you are on the submit node and make the dir:")
-    print("/scratch/{}/log.log".format(whoami))
+    print("/scratch/{}".format(whoami))
+    exit()
 
   file = open(subfile, "w")
 
@@ -30,7 +31,7 @@ def MakeCondorSubmission(inputDir, outputDir, subfile):
   file.write("Log = /scratch/{}/log.log\n".format(whoami))
   file.write("request_memory = 4GB\n")
   file.write("Arguments = {} {} $(Process)\n".format(inputDir, outputDir))
-  file.write("Queue 10") #This is the number of CORSIKA files that will be processed (per eng/zen dir)
+  file.write("Queue 5") #This is the number of CORSIKA files that will be processed (per eng/zen dir)
   file.close()
 
 for prim in prims:

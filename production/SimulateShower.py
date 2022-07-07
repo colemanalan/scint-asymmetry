@@ -118,12 +118,25 @@ if len(infiles) != 1:
 for corsikaFile in infiles:
 
     # Make a file with a Geometry Frame
-    gFileName = ABS_PATH_HERE + "/TempI3Geometry.i3.gz"
+    parentOutputDir = os.path.dirname(output)
+    gFileName = parentOutputDir + "/temp_gcd_{}.i3.gz".format(output.split("_")[-1])
+    print("Making GCD", gFileName)
+
     i3File = dataio.I3File(gFileName, "w")
     i3Geometry = MakeI3Geometry(corsikaFile, narms=12, dr=20 * I3Units.m, maxR=500 * I3Units.m)
     gFrame = icetray.I3Frame(icetray.I3Frame.Geometry)
     gFrame["I3ScintGeometry"] = i3Geometry
+    gFrame["I3Geometry"] = dataclasses.I3Geometry()
     i3File.push(gFrame)
+
+    cFrame = icetray.I3Frame(icetray.I3Frame.Calibration)
+    cFrame["I3Calibration"] = dataclasses.I3Calibration()
+    i3File.push(cFrame)
+
+    dFrame = icetray.I3Frame(icetray.I3Frame.DetectorStatus)
+    dFrame["I3DetectorStatus"] = dataclasses.I3DetectorStatus()
+    i3File.push(dFrame)
+
     i3File.close()
 
     options["gcd"] = gFileName

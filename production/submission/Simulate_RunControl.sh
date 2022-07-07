@@ -8,7 +8,7 @@ echo HERE: $HERE
 ###########################################
 
 ENVSHELL=/home/acoleman/work/icecube-software/surface-array/build/env-shell.sh
-FLAGS="--no_radio --gcd dummy"
+FLAGS="--gcd dummy"
 
 ###########################################
 ###########################################
