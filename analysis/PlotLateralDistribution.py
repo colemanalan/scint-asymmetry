@@ -14,6 +14,7 @@ plt.rcParams["mathtext.fontset"] = "dejavuserif"
 
 from icecube import icetray, dataio, dataclasses, radcube
 from icecube.dataclasses import I3Constants
+from icecube.icetray import I3Units
 
 import numpy as np
 import os
@@ -28,22 +29,6 @@ parser.add_argument("--output", type=str, default=ABS_PATH_HERE + "/../plots/Lat
 args = parser.parse_args()
 
 from I3Tray import I3Tray
-
-
-def GetRadius(particle, pos):
-    # Particle is the primary particle and pos is the detector position
-    x_c = particle.pos.x
-    y_c = particle.pos.y
-    z_c = particle.pos.z
-
-    nx = particle.dir.x
-    ny = particle.dir.y
-
-    abs_x_sq = (pos[0] - x_c) * (pos[0] - x_c) + (pos[1] - y_c) * (pos[1] - y_c) + (pos[2] - z_c) * (pos[2] - z_c)
-
-    n_prod_x = nx * (pos[0] - x_c) + ny * (pos[1] - y_c) - np.sqrt(1.0 - nx * nx - ny * ny) * (pos[2] - z_c)
-
-    return np.sqrt(abs_x_sq - n_prod_x * n_prod_x)
 
 
 class PlotLDF(icetray.I3Module):
@@ -67,37 +52,45 @@ class PlotLDF(icetray.I3Module):
         delays = []
 
         pulseSeriesMap = frame["SiPMRecoPulses"]
-        #Iterate over all the panels in the frame
+        # Iterate over all the panels in the frame
         for scintkey in pulseSeriesMap.keys():
-            pulse = pulses[scintkey]
+            pulse = pulseSeriesMap[scintkey][0]
 
-            #Extract the signal properties for this panel
+            # Extract the signal properties for this panel
             signalAmplitude = pulse.charge
-            signalArrivalTime = pulse.t
+            signalArrivalTime = pulse.time
 
-            pos = self.i3scintgeo[scintkey]
-            radius = GetRadius(particle, pos)
+            # 3D vector descibing the location of the scintillator
+            pos = self.i3scintgeo[scintkey].position
 
-            #Store things for plotting later
+            # 3D vector describing the location of the core
+            core = particle.pos
+
+            # Unit vector describing the direction of shower propagation
+            dirUnit = particle.dir
+
+            ########################################
+            # You will have to fill this part out to calculate the distance from the shower axis and the
+            ########################################
+            radius = 0.0
+            delay = 0.0
+
+            # Store things for plotting later
             amps.append(signalAmplitude)
             times.append(signalArrivalTime)
             radii.append(radius)
+            delays.append(delay)
 
-            #Some math to calculate the expected arrival time of particles
-            dR = pos - particle.pos
-            arrival = particle.time - dR.Dot(dataclasses.I3Position(particle.dir)) / I3Constants.c
-            delays.append(arrival - signalArrivalTime)
-
-        #Convert into numpy arrays to make things easier
+        # Convert into numpy arrays to make things easier
         amps = np.array(amps)
         times = np.array(times)
         radii = np.array(radii)
         delays = np.array(delays)
 
-        #Start making the plots
+        # Start making the plots
         NRows = 1
         NCols = 2
-        gs = gridspec.GridSpec(NRows, NCols, wspace=0.1, hspace=0.3)
+        gs = gridspec.GridSpec(NRows, NCols, wspace=0.3, hspace=0.3)
         fig = plt.figure(figsize=(6 * NCols, 5 * NRows))
 
         # LDF Calculation
@@ -105,21 +98,20 @@ class PlotLDF(icetray.I3Module):
         ax.scatter(radii / I3Units.m, amps)
         ax.set_yscale("log")
         ax.set_xlabel("Radius [m]")
-        ax.set_yscale("Signal [MIP]")
+        ax.set_ylabel("Signal [MIP]")
 
         # Shower front calculation
         ax = fig.add_subplot(gs[1])
         ax.scatter(radii / I3Units.m, delays / I3Units.ns)
-        ax.set_yscale("log")
         ax.set_xlabel("Radius [m]")
-        ax.set_yscale("Delay w.r.t. Shower Plane [ns]")
+        ax.set_ylabel("Delay w.r.t. Shower Plane [ns]")
 
         print("Saving plot as", args.output)
         fig.savefig(args.output, bbox_inches="tight")
 
 
 tray = I3Tray()
-tray.AddSegment("I3Reader", "Reader", input=args.input)
+tray.AddModule("I3Reader", "Reader", Filename=args.input)
 tray.AddModule(PlotLDF, "Plotter")
 tray.Execute()
 tray.Finish()
