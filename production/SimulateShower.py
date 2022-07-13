@@ -48,22 +48,22 @@ def MakeI3Geometry(simfile, narms, dr, maxR):
     with open(inpFile) as f:
         for line in f:
             if "THETAP" in line:
-                zenith = float(line.split()[1]) * I3Units.degree
+                zenithCorsika = float(line.split()[1]) * I3Units.degree
             elif "PHIP" in line:
-                azimuth = float(line.split()[1]) * I3Units.degree
+                azimuthCorsika = float(line.split()[1]) * I3Units.degree
             elif "OBSLEV" in line:
                 obslev = float(line.split()[1]) * I3Units.cm
 
     # Convert to I3
-    azimuth -= np.pi  # Points to where it came from
+    azimuthCorsika -= np.pi  # Points to where it came from
     obslev -= dataclasses.I3Constants.OriginElev
-    direction = dataclasses.I3Direction(zenith, azimuth)
+    direction = dataclasses.I3Direction(zenithCorsika, azimuthCorsika)
     direction.rotate_z(radcube.GetMagneticRotation())  # Corsika in mag coords
 
     print("InI3Coords direction: {} obslev: {}".format(direction, obslev / I3Units.m))
 
     particle = dataclasses.I3Particle()
-    particle.dir = dataclasses.I3Direction(zenith, azimuth)
+    particle.dir = direction
     particle.pos = dataclasses.I3Position(0, 0, 0)
 
     def MakeScintGeo(position, orientation=0.0, heightAboveSnow=0.5 * I3Units.m, name="scintillator_test"):
@@ -91,7 +91,7 @@ def MakeI3Geometry(simfile, narms, dr, maxR):
 
             posInShCS = dataclasses.I3Position(r * np.cos(angle), r * np.sin(angle), 0)
             posInIC = radcube.GetICFromShower(posInShCS, particle.dir)
-            posInIC += dataclasses.I3Direction(zenith, azimuth) * (posInIC.z - 10. * I3Units.cm) / np.cos(particle.dir.zenith)  # Project the panel a bit below obslev
+            posInIC += particle.dir * (posInIC.z + 50. * I3Units.cm) / np.cos(particle.dir.zenith)  # Project the panel a bit below obslev
             posInIC.z += obslev
 
             scintGeo = MakeScintGeo(posInIC, np.random.rand() * 2 * np.pi, 2.0 * I3Units.m, "arm{0}_rad{1:0.1f}".format(iang + 1, r))
@@ -135,7 +135,7 @@ for corsikaFile in infiles:
     print("Making GCD", gFileName)
 
     i3File = dataio.I3File(gFileName, "w")
-    i3Geometry = MakeI3Geometry(corsikaFile, narms=12, dr=20 * I3Units.m, maxR=500 * I3Units.m)
+    i3Geometry = MakeI3Geometry(corsikaFile, narms=12, dr=15 * I3Units.m, maxR=510 * I3Units.m)
     gFrame = icetray.I3Frame(icetray.I3Frame.Geometry)
     gFrame["I3ScintGeometry"] = i3Geometry
     gFrame["I3Geometry"] = dataclasses.I3Geometry()

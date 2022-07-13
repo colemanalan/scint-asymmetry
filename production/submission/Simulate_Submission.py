@@ -32,7 +32,7 @@ def MakeCondorSubmission(inputDir, outputDir, subfile):
     file.write("Log = /scratch/{}/log.log\n".format(whoami))
     file.write("request_memory = 4GB\n")
     file.write("Arguments = {} {} $(Process)\n".format(inputDir, outputDir))
-    file.write("Queue 5")  # This is the number of CORSIKA files that will be processed (per eng/zen dir)
+    file.write("Queue 20")  # This is the number of CORSIKA files that will be processed (per eng/zen dir)
     file.close()
 
 
