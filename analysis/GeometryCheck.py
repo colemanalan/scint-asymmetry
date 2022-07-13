@@ -25,7 +25,7 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("input", nargs="+", help="Input I3 file with scintillator response")
-parser.add_argument("--output", type=str, default=ABS_PATH_HERE + "/../plots/LateralDistribution.pdf", help="Name for the pdf with the plotted data")
+parser.add_argument("--output", type=str, default=ABS_PATH_HERE + "/../plots/Geometrycheck.pdf", help="Name for the pdf with the plotted data")
 args = parser.parse_args()
 
 from I3Tray import I3Tray
@@ -34,7 +34,7 @@ def dR(pos,core):
     return pos-core
 
 def testhigh(x):
-    return 1
+    return x
 
 def Radius(pos, core, dirUnit):
     dr=np.sqrt(dR(pos, core).x**2+dR(pos, core).y**2+dR(pos, core).z**2)
@@ -79,6 +79,7 @@ class PlotLDF(icetray.I3Module):
         xsallinsc = []
         ysallinsc = []
         radiiall = []
+        tests = []
 
 
         pulseSeriesMap = frame["SiPMRecoPulses"]
@@ -99,12 +100,14 @@ class PlotLDF(icetray.I3Module):
             yallinsc = posinsc.y
 
             radiusall = Radius(pos, core, dirUnit)
+            test= testhigh(radiusall)
 
             xsall.append(regularx)
             ysall.append(regulary)
             xsallinsc.append(xallinsc)
             ysallinsc.append(yallinsc)
             radiiall.append(radiusall)
+            tests.append(test)
 
 
 
@@ -132,9 +135,8 @@ class PlotLDF(icetray.I3Module):
             #Position in shower coordinates
             posinsc = radcube.GetShowerFromIC(pos - particle.pos, particle.dir)
 
-
             ########################################
-            # You will have to fill this part out to calculate the distance from the shower axis and the
+            # Distance from the shower axis
             ########################################
             radius = Radius(pos, core, dirUnit)
             delay = signalArrivalTime-TimeDelay(pos, time_core, core , -dirUnit)
@@ -170,6 +172,8 @@ class PlotLDF(icetray.I3Module):
         ysinsc = np.array(ysinsc)
         xsallinsc = np.array(xsallinsc)
         ysallinsc = np.array(ysallinsc)
+        radiiall = np.array(radiiall)
+        tests = np.array(tests)
 
 
 
@@ -189,17 +193,20 @@ class PlotLDF(icetray.I3Module):
 
         # Shower front calculation
         ax = fig.add_subplot(gs[1])
-        ax.scatter(xsall / I3Units.m, ysall / I3Units.m, alpha=0.2, color="k")
+        ax.scatter(xsallinsc / I3Units.m, ysallinsc / I3Units.m, alpha=0.2, color="k")
         ax.scatter(xsinsc / I3Units.m, ysinsc / I3Units.m, c=lates, cmap='coolwarm')
         ax.set_xlabel("x in s.c [m]")
         ax.set_ylabel("y in s.c. [m]")
         ax.set_aspect("equal")
 
-        
+        #Check for the radius
         ax = fig.add_subplot(gs[2])
-        ax.scatter(radiiall / I3Units.m, testhigh(radiiall), c=lates, cmap='coolwarm')
+        ax.scatter(radiiall / I3Units.m, tests)
         ax.set_xlabel("Radius [m]")
         ax.set_ylabel("Test high")
+        ax.set_aspect("equal")
+        ax.set_xlim([0,100])
+        ax.set_ylim([0,100])
 
         print("Saving plot as", args.output)
         fig.savefig(args.output, bbox_inches="tight")
