@@ -77,6 +77,10 @@ class PlotLDF(icetray.I3Module):
         
        
         pulseSeriesMap = frame["SiPMRecoPulses"]
+
+        #Number of rings
+        nrings = 5
+        narms = 12
         
 
         # Iterate over all the panels in the frame
@@ -116,10 +120,6 @@ class PlotLDF(icetray.I3Module):
             regularx = pos.x #In IceCube coordinates
             regulary =pos.y #In IceCube coordinates
 
-            #Number of rings
-            nrings = 5
-            narms = 12
-
 
             if (scintkey.station <= nrings):                
                 
@@ -151,117 +151,47 @@ class PlotLDF(icetray.I3Module):
         xsinsc = np.array(xsinsc)
         ysinsc = np.array(ysinsc)
 
-    
-
-        #Separate the info for the different rings
-        lates1 = lates[0:narms]
-        lates2 = lates[narms: 2*narms]
-        lates3 = lates[2*narms:3*narms]
-        lates4 = lates[3*narms:4*narms]
-        lates5 = lates[4*narms:5*narms]
-
-        #Signals normalized to the average signals in each ring  
-
-        rate1 = amps[0:narms]/np.average(amps[0:narms])
-        rate2 = amps[narms: 2*narms]/np.average(amps[narms: 2*narms])
-        rate3 = amps[2*narms:3*narms]/np.average(amps[2*narms:3*narms])
-        rate4 = amps[3*narms:4*narms]/np.average(amps[3*narms:4*narms])
-        rate5 = amps[4*narms:5*narms]/np.average(amps[4*narms:5*narms])
-
-        #Getting linear fitting coefficients
-        coef1 = np.polyfit(lates1, rate1, 1)
-        coef2 = np.polyfit(lates2, rate2, 1) 
-        coef3 = np.polyfit(lates3, rate3, 1)
-        coef4 = np.polyfit(lates4, rate4, 1)
-        coef5 = np.polyfit(lates5, rate5, 1) 
-
-        print(coef1, coef2, coef3,coef4, coef5)
-
-        #Save the slopes in an array
-        slopes.append(coef1[0])
-        slopes.append(coef2[0])
-        slopes.append(coef3[0])
-        slopes.append(coef4[0])
-        slopes.append(coef5[0])
-
-        slopes = np.array(slopes)
-
-        print(radii)
-        print(slopes)
-
-        #Ploynomials from the fitting
-
-        fit1 = np.poly1d(coef1)
-        fit2 = np.poly1d(coef2)
-        fit3 = np.poly1d(coef3)
-        fit4 = np.poly1d(coef4)
-        fit5 = np.poly1d(coef5)
-
-        print(fit1)
-
-        #For plotting the fittings
         xfittings = np.linspace(-1, 1, 200)
 
-
-
-        ##########################################################################################################
-        ##########################################################################################################
-        ##Computation for the slope vs the radius.
-        ##########################################################################################################
-        ##########################################################################################################
-
-
-
-
-        # Start making the plots
+    
+        # Start making the plots and fill this in the for
         NRows = 2
         NCols = 3
         gs = gridspec.GridSpec(NRows, NCols, wspace=0.3, hspace=0.3)
         fig = plt.figure(figsize=(6 * NCols, 5 * NRows))
+ 
+        #For doing each plot
+        for ii in np.arange(nrings):
 
-        # Signal normalized by the average signal
-        ax = fig.add_subplot(gs[0])
-        ax.scatter(lates1, rate1, c=lates1, cmap='coolwarm' )
-        ax.plot(xfittings, fit1(xfittings), color="k")
-        #ax.set_yscale("log")
-        ax.set_xlabel("$\\sin\\psi$")
-        ax.set_ylabel("$S/\\bar{S}$")
-        ax.set_title("r = 15 m")
+            lates_per_ring = lates[ii*narms:(ii+1)*narms]
 
-        ax = fig.add_subplot(gs[1])
-        ax.scatter(lates2, rate2, c=lates2, cmap='coolwarm' )
-        ax.plot(xfittings, fit2(xfittings), color="k")
-        #ax.set_yscale("log")
-        ax.set_xlabel("$\\sin\\psi$")
-        ax.set_ylabel("$S/\\bar{S}$")
-        ax.set_title("r = 30 m")
+            #Average of the signal per ring.
+            avg = np.average(amps[ii*narms:(ii+1)*narms])
 
+            #Signals normalized to the average signal (in each ring).
+            rate_per_ring = amps[ii*narms:(ii+1)*narms]/avg
 
-        ax = fig.add_subplot(gs[2])
-        ax.scatter(lates3, rate3, c=lates3, cmap='coolwarm' )
-        ax.plot(xfittings, fit3(xfittings), color="k")
-        #ax.set_yscale("log")
-        ax.set_xlabel("$\\sin\\psi$")
-        ax.set_ylabel("$S/\\bar{S}$")
-        ax.set_title("r = 45 m")
+            #Coeficients for the linear fitting
+            coef=np.polyfit(lates_per_ring, rate_per_ring, 1)
+            slopes.append(coef[0])
 
+            #Polynomials from the fitting
+            fit1 = np.poly1d(coef)
+            r_plot = 15*ii
 
-        ax = fig.add_subplot(gs[3])
-        ax.scatter(lates4, rate4, c=lates4, cmap='coolwarm' )
-        ax.plot(xfittings, fit4(xfittings), color="k")
-        #ax.set_yscale("log")
-        ax.set_xlabel("$\\sin\\psi$")
-        ax.set_ylabel("$S/\\bar{S}$")
-        ax.set_title("r = 60 m")
+            #For plotting the fittings
+            ax = fig.add_subplot(gs[ii])
+            ax.scatter(lates_per_ring, rate_per_ring, c=lates_per_ring, cmap='coolwarm' )
+            ax.plot(xfittings, fit1(xfittings), color="k")
+            #ax.set_yscale("log")
+            ax.set_xlabel("$\\sin\\psi$")
+            ax.set_ylabel("$S/\\bar{S}$")
+            ax.set_title("r= "+str(r_plot)+" m, $\\bar{S}= $"+ str(avg)+".")
+                
+        slopes = np.array(slopes)
 
-
-        ax = fig.add_subplot(gs[4])
-        ax.scatter(lates5, rate5, c=lates5, cmap='coolwarm' )
-        ax.plot(xfittings, fit5(xfittings), color="k")
-        #ax.set_yscale("log")
-        ax.set_xlabel("$\\sin\\psi$")
-        ax.set_ylabel("$S/\\bar{S}$")
-        ax.set_title("r = 75 m")
+        print(radii)
+        print(slopes)
 
         ax = fig.add_subplot(gs[5])
         ax.scatter(radii, slopes, color="steelblue")
