@@ -13,7 +13,7 @@ i3Dir = ABS_PATH_HERE + "/../../data/i3-files"
 logDir = ABS_PATH_HERE + "/logfiles"
 
 prims = ["proton", "iron"]
-energies = ["{0:0.1f}".format(16.0 + i / 10) for i in range(1)]
+energies = ["{0:0.1f}".format(16.5 + i / 10) for i in range(1)]
 
 
 def MakeCondorSubmission(inputDir, outputDir, subfile):
