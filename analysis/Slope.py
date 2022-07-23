@@ -102,8 +102,13 @@ class PlotLDF(icetray.I3Module):
         icetray.I3Module.__init__(self, ctx)
 
         self.i3scintgeo = False
-
-        self.
+        #Arrays with the data collected for all simulations
+        self.ALL_radii = []
+        self.ALL_ratio = []
+        self.ALL_xsinsc = []
+        self.ALL_lates = [] # This is the sin psi. 
+        self.ALL_slopes = []
+        self.ALL_slopeserr = []
 
     def Geometry(self, frame):
         self.i3scintgeo = frame["I3ScintGeometry"].scintgeo
@@ -114,18 +119,10 @@ class PlotLDF(icetray.I3Module):
             self.narms = max(self.narms, scintkey.panel)
             self.nrings = max(self.nrings, scintkey.station)
 
-        #Arrays with the data collected for all simulations
-        self.ALL_radii = []
-        self.ALL_amps = []
-        self.ALL_xsinsc = []
-        self.ALL_ysinsc = []
-        self.ALL_slopes = []
-        self.ALL_slopeserr = []
-
 
         print("Found scint geometry for", len(self.i3scintgeo), "panels")
-        print(self.narms)
-        print(self.nrings)
+        # print("Number of arms ", self.narms)
+        # print("Number of rings ", self.nrings)
 
     def DAQ(self, frame):
         particle = frame["MCPrimary"]
@@ -144,6 +141,11 @@ class PlotLDF(icetray.I3Module):
         ysinsc = np.zeros((self.narms, self.nrings))
         slopes = np.zeros(self.nrings)
         slopeserr = np.zeros(self.nrings)
+        avgs = np.zeros(self.nrings)
+
+        rates_per_event = np.zeros((self.narms, self.nrings))
+        # rate_per_ring = np.zeros(self.narms)
+        # rates_per_event = []
         
        
         pulseSeriesMap = frame["SiPMRecoPulses"]
@@ -163,6 +165,10 @@ class PlotLDF(icetray.I3Module):
                 radius = Radius(pos, core, dirUnit)
 
                 radii[scintkey.station - 1] = radius
+
+                ####################################################
+                #Save the information about radii in the ALL vector.
+                self.ALL_radii.append(radii)
 
         # Iterate over all the panels in the frame
         for scintkey in pulseSeriesMap.keys():
@@ -188,9 +194,6 @@ class PlotLDF(icetray.I3Module):
             posinsc = radcube.GetShowerFromIC(pos - particle.pos, particle.dir)
 
 
-            ########################################
-            # You will have to fill this part out to calculate the distance from the shower axis and the
-            ########################################
             radius = Radius(pos, core, dirUnit)
             delay = signalArrivalTime-TimeDelay(pos, time_core, core , -dirUnit)
             #print(scintkey)
@@ -201,7 +204,7 @@ class PlotLDF(icetray.I3Module):
             regularx = pos.x #In IceCube coordinates
             regulary =pos.y #In IceCube coordinates
 
-            # Store things for plotting later
+            # Store things for plotting later, panel 
             amps[scintkey.panel-1, scintkey.station -1] = signalAmplitude
             #times[scintkey.panel-1, scintkey.station -1] = signalArrivalTime
             delays[scintkey.panel-1, scintkey.station -1] = delay
@@ -213,7 +216,33 @@ class PlotLDF(icetray.I3Module):
 
 
 
+        # print("Amps ", amps)
+        # print("Lates", lates)
         # Variables for the fittings on the plots
+        
+        #For doing each plot
+        for ii in np.arange(self.nrings):
+
+            #Average of the signal per ring.
+            avgs[ii] = np.average(amps[:,ii]) #THIS
+            # print("average per ring", avgs[ii])
+
+            #Signals normalized to the average signal (in each ring).
+            if avgs[ii] != 0:
+                rates_per_event [:, ii] = amps[:,ii]/avgs[ii]  
+           
+        
+        
+        self.ALL_ratio.append(rates_per_event)
+        self.ALL_lates.append(lates)
+
+
+    def Finish(self):
+        #This runs after the last shower is read in
+
+        self.ALL_ratio = np.array(self.ALL_ratio)
+        self.ALL_lates = np.array(self.ALL_lates)
+
         xfittings = np.linspace(-1, 1, 200)
         rfittings = np. linspace(0, self.nrings*15, 200)
 
@@ -224,64 +253,23 @@ class PlotLDF(icetray.I3Module):
         gs = gridspec.GridSpec(NRows, NCols, wspace=0.3, hspace=0.3)
         fig = plt.figure(figsize=(6 * NCols, 5 * NRows))
  
-        #For doing each plot
         for ii in np.arange(self.nrings):
-
-            lates_per_ring = lates[:,ii]
-
-            #Average of the signal per ring.
-            avg = np.average(amps[:,ii]) #THIS
-
-            #Signals normalized to the average signal (in each ring).
-            rate_per_ring = amps[:,ii]/avg #THIS
-
-            #Coeficients for the linear fitting
-            coef=Linearfit(lates_per_ring, rate_per_ring)
-            slopes[ii] = coef[0]
-
-            #Polynomials from the fitting
-            fit = np.poly1d(coef)
 
             r_plot = 15*ii
 
-            bootstraping1 = Bootstraping(lates_per_ring, rate_per_ring)
-
             #For plotting the fittings
             ax = fig.add_subplot(gs[ii])
-            for pram in bootstraping1:
-                plotting = np.poly1d(pram)
-                ax.plot(xfittings, plotting(xfittings), color="k", alpha=0.1)
-
-            ax.plot(xfittings, fit(xfittings), color='r')
-            slopeserr[ii] = np.std(bootstraping1[:,0])/np.sqrt(len(bootstraping1))
-
-            ax.scatter(lates_per_ring, rate_per_ring, c=lates_per_ring, cmap='coolwarm' )
+            ax.scatter(self.ALL_lates[:,:,ii], self.ALL_ratio[:,:,ii], c=self.ALL_lates, cmap='coolwarm' )
             #ax.set_yscale("log")
             ax.set_xlabel("$\\sin\\psi$")
             ax.set_ylabel("$S/\\bar{S}$")
-            ax.set_title(r"r= {0} m, $\bar{{S}} = ${1:0.1f}".format(r_plot, avg))
-
-        slopes = np.array(slopes)
-
-        #print(radii)
-        print("SLOPES TO BE PLOTTED:")
-        print(slopes)
-        print(radii)
-        print(slopeserr)
-
-        ax = fig.add_subplot(gs[35])
-        ax.errorbar(radii, slopes, slopeserr,  color="k")
+            ax.set_title(r"r= {0} m".format(r_plot))
         
-        #ax.set_yscale("log")
-        ax.set_xlabel("Radius [m]")
-        ax.set_ylabel("Slope")
-        ax.set_title("Slope in terms of the radius")
+    
 
         print("Saving plot as", args.output)
         fig.savefig(args.output, bbox_inches="tight")
 
-    def Finish(self):
-        #This runs after the last shower is read in
         print("Done!")
 
 
@@ -289,4 +277,4 @@ tray = I3Tray()
 tray.AddModule("I3Reader", "Reader", FilenameList=args.input)
 tray.AddModule(PlotLDF, "Plotter")
 tray.Execute()
-tray.Finish()    
+tray.Finish()   
