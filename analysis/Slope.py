@@ -56,10 +56,15 @@ def Linearfit(X,Y):
     #fit = np.poly1d(coef)
     return coef
 
-def Bootstraping(X,Y):
-    num_trials = len(X)
-    idxfortrials = np.arange(X.size)
+def Bootstraping(Xnd,Ynd): #Considering n dimensional arrays
+    # num_trials = len(Xnd)
+    # num_trials = Xnd.size
+    idxfortrials = np.arange(Xnd.size)
     #print(idxfortrials)
+
+    X = Xnd.flatten()
+    Y = Ynd.flatten()
+    num_trials = len(X)
 
     #Definition of the vectors for whom we are going to take the linear fit
     Xnew = np.zeros(len(X))
@@ -103,11 +108,9 @@ class PlotLDF(icetray.I3Module):
 
         self.i3scintgeo = False
         #Arrays with the data collected for all simulations
-        self.ALL_radii = []
         self.ALL_ratio = []
         self.ALL_xsinsc = []
         self.ALL_lates = [] # This is the sin psi. 
-        self.ALL_slopes = []
         self.ALL_slopeserr = []
 
     def Geometry(self, frame):
@@ -119,6 +122,9 @@ class PlotLDF(icetray.I3Module):
             self.narms = max(self.narms, scintkey.panel)
             self.nrings = max(self.nrings, scintkey.station)
 
+        self.ALL_radii = np.zeros(self.nrings)
+        self.ALL_slopes = np.zeros(self.nrings)
+        self.ALL_slopeserr = np.zeros(self.nrings)
 
         print("Found scint geometry for", len(self.i3scintgeo), "panels")
         # print("Number of arms ", self.narms)
@@ -139,8 +145,6 @@ class PlotLDF(icetray.I3Module):
         ysall = np.zeros((self.narms, self.nrings))
         xsinsc = np.zeros((self.narms, self.nrings))
         ysinsc = np.zeros((self.narms, self.nrings))
-        slopes = np.zeros(self.nrings)
-        slopeserr = np.zeros(self.nrings)
         avgs = np.zeros(self.nrings)
 
         rates_per_event = np.zeros((self.narms, self.nrings))
@@ -151,11 +155,11 @@ class PlotLDF(icetray.I3Module):
         pulseSeriesMap = frame["SiPMRecoPulses"]
 
         for scintkey in self.i3scintgeo.keys():
+            pos = self.i3scintgeo[scintkey].position
+
 
             if scintkey.panel == 1:
                 # 3D vector descibing the location of the scintillator
-                pos = self.i3scintgeo[scintkey].position
-
                 # 3D vector describing the location of the core
                 core = particle.pos
 
@@ -164,11 +168,17 @@ class PlotLDF(icetray.I3Module):
                 
                 radius = Radius(pos, core, dirUnit)
 
-                radii[scintkey.station - 1] = radius
+                self.ALL_radii[scintkey.station - 1] = radius
 
-                ####################################################
-                #Save the information about radii in the ALL vector.
-                self.ALL_radii.append(radii)
+            #Position in shower coordinates
+            posinsc = radcube.GetShowerFromIC(pos - particle.pos, particle.dir)
+
+            yinsc = posinsc.y
+            late = (posinsc/np.sqrt(posinsc.x**2+posinsc.y**2)).y
+
+            # print(scintkey, posinsc, yinsc, late)
+
+            lates[scintkey.panel-1, scintkey.station -1] = late #These are ys in sc
 
         # Iterate over all the panels in the frame
         for scintkey in pulseSeriesMap.keys():
@@ -198,8 +208,6 @@ class PlotLDF(icetray.I3Module):
             delay = signalArrivalTime-TimeDelay(pos, time_core, core , -dirUnit)
             #print(scintkey)
             xinsc = posinsc.x
-            yinsc = posinsc.y
-            late = (posinsc/abs(posinsc)).y
 
             regularx = pos.x #In IceCube coordinates
             regulary =pos.y #In IceCube coordinates
@@ -208,7 +216,6 @@ class PlotLDF(icetray.I3Module):
             amps[scintkey.panel-1, scintkey.station -1] = signalAmplitude
             #times[scintkey.panel-1, scintkey.station -1] = signalArrivalTime
             delays[scintkey.panel-1, scintkey.station -1] = delay
-            lates[scintkey.panel-1, scintkey.station -1] = late #These are ys in sc
             xsinsc[scintkey.panel-1, scintkey.station -1] = xinsc
             ysinsc[scintkey.panel-1, scintkey.station -1] = yinsc
             xs[scintkey.panel-1, scintkey.station -1] = regularx
@@ -229,19 +236,19 @@ class PlotLDF(icetray.I3Module):
 
             #Signals normalized to the average signal (in each ring).
             if avgs[ii] != 0:
-                rates_per_event [:, ii] = amps[:,ii]/avgs[ii]  
-           
-        
-        
+                rates_per_event [:, ii] = amps[:,ii]/avgs[ii] 
+
         self.ALL_ratio.append(rates_per_event)
         self.ALL_lates.append(lates)
 
 
     def Finish(self):
-        #This runs after the last shower is read in
-
+        #This runs after the last shower is read.
         self.ALL_ratio = np.array(self.ALL_ratio)
         self.ALL_lates = np.array(self.ALL_lates)
+        self.ALL_slopes = np.array(self.ALL_slopes)
+        self.ALL_slopeserr = np.array(self.ALL_slopeserr)
+
 
         xfittings = np.linspace(-1, 1, 200)
         rfittings = np. linspace(0, self.nrings*15, 200)
@@ -252,20 +259,62 @@ class PlotLDF(icetray.I3Module):
         NCols = 6
         gs = gridspec.GridSpec(NRows, NCols, wspace=0.3, hspace=0.3)
         fig = plt.figure(figsize=(6 * NCols, 5 * NRows))
- 
+        fig.suptitle(r"Ratio in terms of the lateness for $E=10^{16.5}$ eV, $\theta=51\degree$")
+
+      
         for ii in np.arange(self.nrings):
+            r_plot = 15*(ii+1)
 
-            r_plot = 15*ii
 
-            #For plotting the fittings
-            ax = fig.add_subplot(gs[ii])
-            ax.scatter(self.ALL_lates[:,:,ii], self.ALL_ratio[:,:,ii], c=self.ALL_lates, cmap='coolwarm' )
-            #ax.set_yscale("log")
-            ax.set_xlabel("$\\sin\\psi$")
-            ax.set_ylabel("$S/\\bar{S}$")
-            ax.set_title(r"r= {0} m".format(r_plot))
+            ######### SELECTION FOR THE RINGS AND EVENTS IN THE PLOTS#########
+            # We only consider rings with at most 3 non-heatted scintillators. 
+            sel = np.sum(self.ALL_ratio[:,:,ii] != 0, axis = 1) > 9
+            # print("selection ", sel)
+
+            ratio_to_use = self.ALL_ratio[:,:,ii][sel]
+            lates_to_use = self.ALL_lates[:,:,ii][sel]
+
+            if  np.any(ratio_to_use):
+                # print("Ratio to use", ratio_to_use)
+
+                # print("Lates to use", lates_to_use.flatten())
+                coef=Linearfit(lates_to_use.flatten(), ratio_to_use.flatten())
+                self.ALL_slopes[ii] = coef[0]
+                fit = np.poly1d(coef)
+
+                bootstraping1 = Bootstraping(lates_to_use , ratio_to_use  )
+
+
+                #For plotting the fittings
+                ax = fig.add_subplot(gs[ii])
+
+                for pram in bootstraping1:
+                    plotting = np.poly1d(pram)
+                    ax.plot(xfittings, plotting(xfittings), color="k", alpha=0.05)
+
+                ax.plot(xfittings, fit(xfittings), color='r')
+
+                ax.scatter(lates_to_use, ratio_to_use, c=lates_to_use, cmap='coolwarm' )
+                self.ALL_slopeserr[ii] = np.std(bootstraping1[:,0])
+
+                # print(r_plot, np.sum(self.ALL_ratio[:,:,ii] == 0), self.ALL_lates[:,:,ii])
+                #ax.set_yscale("log")
+                ax.set_xlabel("$\\sin\\psi$")
+                ax.set_ylabel("$S/\\bar{S}$")
+                ax.set_title(r"r= {0} m".format(r_plot))
+            
+
+        #Plot of amplitudes vs radius
         
-    
+        ax = fig.add_subplot(gs[self.nrings])
+        ax.errorbar(self.ALL_radii, self.ALL_slopes, self.ALL_slopeserr,  color="k")
+
+        ax.scatter(self.ALL_radii, self.ALL_slopes, color="steelblue")
+
+        #ax.set_yscale("log")
+        ax.set_xlabel("Radius [m]")
+        ax.set_ylabel("Slope")
+        ax.set_title("Slope in terms of the radius")
 
         print("Saving plot as", args.output)
         fig.savefig(args.output, bbox_inches="tight")

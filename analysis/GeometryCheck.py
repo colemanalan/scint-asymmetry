@@ -178,10 +178,11 @@ class PlotLDF(icetray.I3Module):
 
 
         # Start making the plots
-        NRows = 2
+        NRows = 1
         NCols = 2
         gs = gridspec.GridSpec(NRows, NCols, wspace=0.3, hspace=0.3)
         fig = plt.figure(figsize=(6 * NCols, 5 * NRows))
+        fig.suptitle(r"Star layout for $E=10^{16.5}$ eV, $\theta=51\degree$")
 
         # Shower front calculation
         ax = fig.add_subplot(gs[0])
@@ -190,6 +191,7 @@ class PlotLDF(icetray.I3Module):
         ax.set_xlabel("x [m]")
         ax.set_ylabel("y [m]")
         ax.set_aspect("equal")
+        ax.set_title(r"Detector coordinates")
 
         # Shower front calculation
         ax = fig.add_subplot(gs[1])
@@ -198,15 +200,16 @@ class PlotLDF(icetray.I3Module):
         ax.set_xlabel("x in s.c [m]")
         ax.set_ylabel("y in s.c. [m]")
         ax.set_aspect("equal")
+        ax.set_title(r"Shower coordinates")
 
-        #Check for the radius
-        ax = fig.add_subplot(gs[2])
-        ax.scatter(radiiall / I3Units.m, tests)
-        ax.set_xlabel("Radius [m]")
-        ax.set_ylabel("Test high")
-        ax.set_aspect("equal")
-        ax.set_xlim([0,100])
-        ax.set_ylim([0,100])
+        # #Check for the radius
+        # ax = fig.add_subplot(gs[2])
+        # ax.scatter(radiiall / I3Units.m, tests)
+        # ax.set_xlabel("Radius [m]")
+        # ax.set_ylabel("Test high")
+        # ax.set_aspect("equal")
+        # ax.set_xlim([0,100])
+        # ax.set_ylim([0,100])
 
         print("Saving plot as", args.output)
         fig.savefig(args.output, bbox_inches="tight")
