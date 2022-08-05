@@ -250,16 +250,16 @@ class PlotLDF(icetray.I3Module):
         self.ALL_slopeserr = np.array(self.ALL_slopeserr)
 
 
-        xfittings = np.linspace(-1, 1, 200)
+        xfittings = np.linspace(-1, 1, 50)
         rfittings = np. linspace(0, self.nrings*15, 200)
 
     
         # Start making the plots and fill this in the for
-        NRows = 6
+        NRows = 3
         NCols = 6
         gs = gridspec.GridSpec(NRows, NCols, wspace=0.3, hspace=0.3)
         fig = plt.figure(figsize=(6 * NCols, 5 * NRows))
-        fig.suptitle(r"Ratio in terms of the lateness for $E=10^{16.5}$ eV, $\theta=51\degree$")
+        fig.suptitle(r"Ratio in terms of the lateness for $E=10^{15.5}$ eV, $\theta=50\degree$")
 
       
         for ii in np.arange(self.nrings):
@@ -278,6 +278,7 @@ class PlotLDF(icetray.I3Module):
                 # print("Ratio to use", ratio_to_use)
 
                 # print("Lates to use", lates_to_use.flatten())
+                #This is for the nominal slope for the data
                 coef=Linearfit(lates_to_use.flatten(), ratio_to_use.flatten())
                 self.ALL_slopes[ii] = coef[0]
                 fit = np.poly1d(coef)
@@ -288,11 +289,21 @@ class PlotLDF(icetray.I3Module):
                 #For plotting the fittings
                 ax = fig.add_subplot(gs[ii])
 
-                for pram in bootstraping1:
-                    plotting = np.poly1d(pram)
-                    ax.plot(xfittings, plotting(xfittings), color="k", alpha=0.05)
+                # for param in bootstraping1:
+                BOOT = np.array([np.poly1d(param)(xfittings) for param in bootstraping1])
+                
+                means = np.average(BOOT, axis = 0)
+                stds = np.std(BOOT, axis = 0)
+                # print("means", means, "stds", stds)
+                
 
+                #     plotting = np.poly1d(pram)
+                #     ax.plot(xfittings, plotting(xfittings), color="k", alpha=0.2)
+
+                
+                ax.fill_between(xfittings, means-stds, means+stds, color = "k", alpha= 0.4)
                 ax.plot(xfittings, fit(xfittings), color='r')
+
 
                 ax.scatter(lates_to_use, ratio_to_use, c=lates_to_use, cmap='coolwarm' )
                 self.ALL_slopeserr[ii] = np.std(bootstraping1[:,0])
@@ -306,8 +317,11 @@ class PlotLDF(icetray.I3Module):
 
         #Plot of amplitudes vs radius
         
-        ax = fig.add_subplot(gs[self.nrings])
+        ax = fig.add_subplot(gs[17])
         ax.errorbar(self.ALL_radii, self.ALL_slopes, self.ALL_slopeserr,  color="k")
+        ax.tick_params(axis='both', which='both', direction='in')
+        ax.yaxis.set_ticks_position('both')
+        ax.xaxis.set_ticks_position('both')
 
         ax.scatter(self.ALL_radii, self.ALL_slopes, color="steelblue")
 

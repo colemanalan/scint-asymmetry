@@ -8,13 +8,13 @@ import subprocess
 ABS_PATH_HERE = str(os.path.dirname(os.path.realpath(__file__)))
 whoami = getpass.getuser()
 
-simDir = "/data/sim/IceCubeUpgrade/CosmicRay/Radio/coreas/data/discrete"
-i3Dir = ABS_PATH_HERE + "/../../data/i3-files"
+simDir = "/home/ddazamarroquin/work/simulations/data/discrete" #This is the pathfor the showeres "I" submitted
+i3Dir = ABS_PATH_HERE + "/../../data/new-i3-files"
 logDir = ABS_PATH_HERE + "/logfiles"
 
 prims = ["proton", "iron"]
-energies = ["{0:0.1f}".format(16.5 + i / 10) for i in range(1)]
-
+energies = ["{0:0.1f}".format(15.5 + i / 10) for i in range(1)]
+startid = 20
 
 def MakeCondorSubmission(inputDir, outputDir, subfile):
 
@@ -31,7 +31,7 @@ def MakeCondorSubmission(inputDir, outputDir, subfile):
     file.write("Output = {0}/{1}_{2}_{3}_$(Process).out\n".format(logDir, prim, eng, zen))
     file.write("Log = /scratch/{}/log.log\n".format(whoami))
     file.write("request_memory = 4GB\n")
-    file.write("Arguments = {} {} $(Process)\n".format(inputDir, outputDir))
+    file.write("Arguments = {} {} $(Process) {}\n".format(inputDir, outputDir, startid))
     file.write("Queue 20")  # This is the number of CORSIKA files that will be processed (per eng/zen dir)
     file.close()
 

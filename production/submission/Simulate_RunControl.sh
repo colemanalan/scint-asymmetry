@@ -17,7 +17,7 @@ eval `/cvmfs/icecube.opensciencegrid.org/py3-v4.1.0/setup.sh`
 
 INPUTDIR=$1
 OUTPUTDIR=$2
-ID=$3
+ID=$(($3 + $4))
 
 echo INPUTDIR: $INPUTDIR
 echo OUTPUTDIR: $OUTPUTDIR
