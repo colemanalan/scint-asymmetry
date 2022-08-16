@@ -8,6 +8,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from matplotlib.ticker import MultipleLocator, FixedLocator
+from scipy.optimize import curve_fit
 
 plt.rcParams["font.family"] = "serif"
 plt.rcParams["mathtext.fontset"] = "dejavuserif"
@@ -55,6 +56,12 @@ def Linearfit(X,Y):
     #Polynomials from the fitting
     #fit = np.poly1d(coef)
     return coef
+
+#################### Function for fitting the Slope vs r data. A and B need to be fitted.
+def fitting_slope(x, A, B):
+    y = -B*(np.expm1(-A*x))
+    #y = A*x**2+B*x
+    return y
 
 def Bootstraping(Xnd,Ynd): #Considering n dimensional arrays
     # num_trials = len(Xnd)
@@ -121,7 +128,6 @@ class PlotLDF(icetray.I3Module):
         for scintkey in self.i3scintgeo.keys():
             self.narms = max(self.narms, scintkey.panel)
             self.nrings = max(self.nrings, scintkey.station)
-
         self.ALL_radii = np.zeros(self.nrings)
         self.ALL_slopes = np.zeros(self.nrings)
         self.ALL_slopeserr = np.zeros(self.nrings)
@@ -251,11 +257,9 @@ class PlotLDF(icetray.I3Module):
 
 
         xfittings = np.linspace(-1, 1, 50)
-        rfittings = np. linspace(0, self.nrings*15, 200)
-
     
         # Start making the plots and fill this in the for
-        NRows = 3
+        NRows = 5
         NCols = 6
         gs = gridspec.GridSpec(NRows, NCols, wspace=0.3, hspace=0.3)
         fig = plt.figure(figsize=(6 * NCols, 5 * NRows))
@@ -285,7 +289,7 @@ class PlotLDF(icetray.I3Module):
 
                 bootstraping1 = Bootstraping(lates_to_use , ratio_to_use  )
 
-
+                print("Passing by")
                 #For plotting the fittings
                 ax = fig.add_subplot(gs[ii])
 
@@ -315,15 +319,55 @@ class PlotLDF(icetray.I3Module):
                 ax.set_title(r"r= {0} m".format(r_plot))
             
 
+        # Subarrays for only considering the first data, since at some redius the rings are not getting enough signal.
+
+        #print("All Slopes", self.ALL_slopes)
+
+        ##Selection for the creation of the subarrays
+        sel_slopes = self.ALL_slopes != 0
+        #print(sel_slopes)
+
+        plot_slopes = self.ALL_slopes[sel_slopes]
+        plot_err = self.ALL_slopeserr[sel_slopes]
+        plot_radii = self.ALL_radii[sel_slopes]
+
+        print(plot_slopes)
+        print(plot_err)
+        print(plot_radii)
+
+        plot_rmax = np.amax(plot_radii)
+        rfittings = np. linspace(0, plot_rmax, 200)
+
+
+        ########### Fitting the slope vs radius data 
+
+        print("Making the fitting")
+
+        param_fit_slope, covariance = curve_fit(fitting_slope, plot_radii, plot_slopes, maxfev = 5000)
+
+        ## Fit for B(1-exp(-Ar))
+        fit_A = param_fit_slope[0]
+        fit_B = param_fit_slope[1]
+ 
+        fit_slope = fitting_slope(rfittings, fit_A, fit_B)
+
+        print(fit_A, fit_B)
+
+        print("Done")
+
         #Plot of amplitudes vs radius
+
+
         
-        ax = fig.add_subplot(gs[17])
-        ax.errorbar(self.ALL_radii, self.ALL_slopes, self.ALL_slopeserr,  color="k")
+        ax = fig.add_subplot(gs[29])
+
+        ax.errorbar(plot_radii, plot_slopes, plot_err,  color="k")
         ax.tick_params(axis='both', which='both', direction='in')
         ax.yaxis.set_ticks_position('both')
         ax.xaxis.set_ticks_position('both')
 
-        ax.scatter(self.ALL_radii, self.ALL_slopes, color="steelblue")
+        ax.scatter(plot_radii, plot_slopes, color="steelblue")
+        ax.plot(rfittings,fit_slope, label = 'fit', color ='purple' )
 
         #ax.set_yscale("log")
         ax.set_xlabel("Radius [m]")
