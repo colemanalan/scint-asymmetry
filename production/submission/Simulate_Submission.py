@@ -13,8 +13,8 @@ i3Dir = ABS_PATH_HERE + "/../../data/new-i3-files"
 logDir = ABS_PATH_HERE + "/logfiles"
 
 prims = ["proton", "iron"]
-energies = ["{0:0.1f}".format(15.5 + i / 10) for i in range(1)]
-startid = 20
+energies = ["{0:0.1f}".format(16.5 + i / 10) for i in range(1)]
+startid = 0
 
 def MakeCondorSubmission(inputDir, outputDir, subfile):
 
@@ -32,7 +32,7 @@ def MakeCondorSubmission(inputDir, outputDir, subfile):
     file.write("Log = /scratch/{}/log.log\n".format(whoami))
     file.write("request_memory = 4GB\n")
     file.write("Arguments = {} {} $(Process) {}\n".format(inputDir, outputDir, startid))
-    file.write("Queue 20")  # This is the number of CORSIKA files that will be processed (per eng/zen dir)
+    file.write("Queue 40")  # This is the number of CORSIKA files that will be processed (per eng/zen dir)
     file.close()
 
 

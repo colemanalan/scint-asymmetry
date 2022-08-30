@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from matplotlib.ticker import MultipleLocator, FixedLocator
 from scipy.optimize import curve_fit
+from scipy.stats import chisquare
 
 plt.rcParams["font.family"] = "serif"
 plt.rcParams["mathtext.fontset"] = "dejavuserif"
@@ -58,9 +59,10 @@ def Linearfit(X,Y):
     return coef
 
 #################### Function for fitting the Slope vs r data. A and B need to be fitted.
-def fitting_slope(x, A, B):
-    y = -B*(np.expm1(-A*x))
-    #y = A*x**2+B*x
+def fitting_slope(x, A, B, C):
+    #y = -B*(np.expm1(-A*x))
+    #y = A*x/(np.sqrt(1+B*x**2))
+    y =  A*x**3+B*x**2+C*x
     return y
 
 def Bootstraping(Xnd,Ynd): #Considering n dimensional arrays
@@ -119,6 +121,7 @@ class PlotLDF(icetray.I3Module):
         self.ALL_xsinsc = []
         self.ALL_lates = [] # This is the sin psi. 
         self.ALL_slopeserr = []
+        self.ALL_chisquare = []
 
     def Geometry(self, frame):
         self.i3scintgeo = frame["I3ScintGeometry"].scintgeo
@@ -132,9 +135,9 @@ class PlotLDF(icetray.I3Module):
         self.ALL_slopes = np.zeros(self.nrings)
         self.ALL_slopeserr = np.zeros(self.nrings)
 
-        print("Found scint geometry for", len(self.i3scintgeo), "panels")
-        # print("Number of arms ", self.narms)
-        # print("Number of rings ", self.nrings)
+        #print("Found scint geometry for", len(self.i3scintgeo), "panels")
+        #print("Number of arms ", self.narms)
+        #print("Number of rings ", self.nrings)
 
     def DAQ(self, frame):
         particle = frame["MCPrimary"]
@@ -255,15 +258,25 @@ class PlotLDF(icetray.I3Module):
         self.ALL_slopes = np.array(self.ALL_slopes)
         self.ALL_slopeserr = np.array(self.ALL_slopeserr)
 
+        #Chi square considering 1. all data 2. the mean for each value of sin(psi)
+        chisquares = []
+        chisquares_asso = []
+
+        #Mean for each value of sin(psi) and value of sin(psi) considering only one element per value.
+        means2 = np.zeros(7)
+        lates_means2 = np.zeros(7)
+
 
         xfittings = np.linspace(-1, 1, 50)
     
         # Start making the plots and fill this in the for
+        #NRows = 1
+        #NCols = 1
         NRows = 5
         NCols = 6
         gs = gridspec.GridSpec(NRows, NCols, wspace=0.3, hspace=0.3)
         fig = plt.figure(figsize=(6 * NCols, 5 * NRows))
-        fig.suptitle(r"Ratio in terms of the lateness for $E=10^{15.5}$ eV, $\theta=50\degree$")
+        fig.suptitle(r"Signal rate in terms of $\sin\psi$ for $E=10^{16.0}$ eV, $\theta=30\degree$")
 
       
         for ii in np.arange(self.nrings):
@@ -278,8 +291,9 @@ class PlotLDF(icetray.I3Module):
             ratio_to_use = self.ALL_ratio[:,:,ii][sel]
             lates_to_use = self.ALL_lates[:,:,ii][sel]
 
+            print(ratio_to_use, np.any(ratio_to_use)) 
+
             if  np.any(ratio_to_use):
-                # print("Ratio to use", ratio_to_use)
 
                 # print("Lates to use", lates_to_use.flatten())
                 #This is for the nominal slope for the data
@@ -287,53 +301,100 @@ class PlotLDF(icetray.I3Module):
                 self.ALL_slopes[ii] = coef[0]
                 fit = np.poly1d(coef)
 
-                bootstraping1 = Bootstraping(lates_to_use , ratio_to_use  )
+                bootstraping1 = Bootstraping(lates_to_use , ratio_to_use)
 
-                print("Passing by")
-                #For plotting the fittings
-                ax = fig.add_subplot(gs[ii])
 
                 # for param in bootstraping1:
                 BOOT = np.array([np.poly1d(param)(xfittings) for param in bootstraping1])
-                
-                means = np.average(BOOT, axis = 0)
-                stds = np.std(BOOT, axis = 0)
-                # print("means", means, "stds", stds)
-                
 
-                #     plotting = np.poly1d(pram)
-                #     ax.plot(xfittings, plotting(xfittings), color="k", alpha=0.2)
+                #Means and standard deviations from the bootstraping. These are not the means and stds from the actual data obtained from the events.
+                means_boot = np.average(BOOT, axis = 0)
+                stds_boot = np.std(BOOT, axis = 0)
+                # print("means_boot", means_boot, "stds_boot", stds_boot)
 
                 
-                ax.fill_between(xfittings, means-stds, means+stds, color = "k", alpha= 0.4)
+                ##Compute the chi square value for this plot
+                #Expected values, i.e, the value of the fitting at each arm 
+                #ratio_expected = fit(lates_to_use)
+                #print("Ratio expected", ratio_to_use)
+
+                #chi_sqr = chisquare(ratio_to_use, ratio_expected, axis = None)
+                #chisquares.append(chi_sqr[0])
+
+
+                #Means and stds for the actual data obtained from the events --> without considering associated arms depending on lateness
+                means = []
+                for jj in np.arange(self.narms):
+                    means.append( np.mean(ratio_to_use[:,jj]) )
+                means = np.array(means)
+
+                # ----> Association
+                 of arms
+                
+                for jj in np.arange(7):
+                    if jj<3:
+                        asso = np.concatenate((ratio_to_use[:,jj],ratio_to_use[ :,(6-jj) ]))
+                        means2[jj]=np.mean( asso )
+                        lates_means2[jj]= lates_to_use[0,jj]
+
+                    elif jj ==3:
+                        means2[jj]=np.mean(ratio_to_use[:,jj])
+                        lates_means2[jj]= lates_to_use[0,jj]
+                    elif jj ==6:
+                        means2[jj]=np.mean(ratio_to_use[:,9])
+                        lates_means2[jj]= lates_to_use[0,9]
+                    else:
+                        asso = np.concatenate((ratio_to_use[:, (3+jj)],ratio_to_use[ :,(15-jj) ]))
+                        means2[jj]=np.mean( asso )
+                        lates_means2[jj]= lates_to_use[0,3+jj]
+
+
+                ##Chi square value considering mean 2
+                chi_sqr_asso = chisquare(means2, fit(lates_means2), axis = None)
+
+                chisquares_asso.append(chi_sqr_asso[0])
+                self.ALL_chisquare.append(chi_sqr_asso)
+
+
+                ####PLOT
+
+                #Definition of the subplot
+                ax = fig.add_subplot(gs[ii])
+
+                #Bootstraping
+                ax.fill_between(xfittings, means_boot-stds_boot, means_boot+stds_boot, color = "k", alpha= 0.4)
+
+                #Linear fit for the data
                 ax.plot(xfittings, fit(xfittings), color='r')
 
-
+                #Data
                 ax.scatter(lates_to_use, ratio_to_use, c=lates_to_use, cmap='coolwarm' )
                 self.ALL_slopeserr[ii] = np.std(bootstraping1[:,0])
 
-                # print(r_plot, np.sum(self.ALL_ratio[:,:,ii] == 0), self.ALL_lates[:,:,ii])
+                #Mean of data
+                ax.scatter(lates_to_use[0,:], means, marker="x")
+                ax.scatter(lates_means2, means2, marker="d", color="seagreen")
+
                 #ax.set_yscale("log")
                 ax.set_xlabel("$\\sin\\psi$")
                 ax.set_ylabel("$S/\\bar{S}$")
-                ax.set_title(r"r= {0} m".format(r_plot))
-            
-
-        # Subarrays for only considering the first data, since at some redius the rings are not getting enough signal.
-
-        #print("All Slopes", self.ALL_slopes)
+                ax.set_title(r"r= {0} m, $\chi^2$={1}.".format( r_plot, np.round(chi_sqr_asso[0],3) ))      
+        
+        self.ALL_chisquare = np.array(self.ALL_chisquare)
 
         ##Selection for the creation of the subarrays
         sel_slopes = self.ALL_slopes != 0
-        #print(sel_slopes)
+        sel_chi_sqr = self.ALL_chisquare[:,0] < 0.5 
+        #print(sel_chi_sqr)
 
-        plot_slopes = self.ALL_slopes[sel_slopes]
-        plot_err = self.ALL_slopeserr[sel_slopes]
-        plot_radii = self.ALL_radii[sel_slopes]
+        plot_slopes = self.ALL_slopes[sel_slopes][sel_chi_sqr]
+        plot_err = self.ALL_slopeserr[sel_slopes][sel_chi_sqr]
+        plot_radii = self.ALL_radii[sel_slopes][sel_chi_sqr]
 
-        print(plot_slopes)
-        print(plot_err)
-        print(plot_radii)
+
+        # print(plot_slopes)
+        # print(plot_err)
+        #print(plot_radii)
 
         plot_rmax = np.amax(plot_radii)
         rfittings = np. linspace(0, plot_rmax, 200)
@@ -341,19 +402,20 @@ class PlotLDF(icetray.I3Module):
 
         ########### Fitting the slope vs radius data 
 
-        print("Making the fitting")
+        #Uncomment print("Making the fitting")
 
-        param_fit_slope, covariance = curve_fit(fitting_slope, plot_radii, plot_slopes, maxfev = 5000)
+        param_fit_slope, covariance = curve_fit(fitting_slope, plot_radii, plot_slopes, maxfev = 20000)
 
         ## Fit for B(1-exp(-Ar))
         fit_A = param_fit_slope[0]
         fit_B = param_fit_slope[1]
- 
-        fit_slope = fitting_slope(rfittings, fit_A, fit_B)
+        fit_C = param_fit_slope[2]
 
-        print(fit_A, fit_B)
+        fit_slope = fitting_slope(rfittings, fit_A, fit_B, fit_C)
 
-        print("Done")
+        print(fit_A,";", fit_B,";", fit_C)
+
+        #Uncomment print("Done")
 
         #Plot of amplitudes vs radius
 
@@ -374,14 +436,14 @@ class PlotLDF(icetray.I3Module):
         ax.set_ylabel("Slope")
         ax.set_title("Slope in terms of the radius")
 
-        print("Saving plot as", args.output)
+        #Uncomment print("Saving plot as", args.output)
         fig.savefig(args.output, bbox_inches="tight")
 
-        print("Done!")
+        #Uncomment print("Done!")
 
 
 tray = I3Tray()
 tray.AddModule("I3Reader", "Reader", FilenameList=args.input)
 tray.AddModule(PlotLDF, "Plotter")
 tray.Execute()
-tray.Finish()   
+tray.Finish()
