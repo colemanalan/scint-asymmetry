@@ -6,6 +6,6 @@
 	do
 		#echo -n "$ii ;" ;
 		echo -n "$jj ;"
-		python3 Slope.py /home/ddazamarroquin/work/scint-asymmetry/data/new-i3-files/proton/lgE_16.0/Zen_$jj/000*.i3.gz
-	done >Parameters_16_0.csv
+		python3 Slope.py /home/ddazamarroquin/work/scint-asymmetry/data/new-i3-files/proton/lgE_16.5/Zen_$jj/000*.i3.gz
+	done >Parameters_16_5.csv
 #done > All_data.csv

@@ -61,8 +61,8 @@ def Linearfit(X,Y):
 #################### Function for fitting the Slope vs r data. A and B need to be fitted.
 def fitting_slope(x, A, B, C):
     #y = -B*(np.expm1(-A*x))
-    #y = A*x/(np.sqrt(1+B*x**2))
-    y =  A*x**3+B*x**2+C*x
+    y = A*x/(np.sqrt(1+B*x**2))
+    #y =  A*x**3+B*x**2+C*x
     return y
 
 def Bootstraping(Xnd,Ynd): #Considering n dimensional arrays
@@ -266,17 +266,31 @@ class PlotLDF(icetray.I3Module):
         means2 = np.zeros(7)
         lates_means2 = np.zeros(7)
 
+        ############################ PLOT ############################
+        #Configuation for kind of printing
 
-        xfittings = np.linspace(-1, 1, 50)
-    
-        # Start making the plots and fill this in the for
-        #NRows = 1
-        #NCols = 1
-        NRows = 5
-        NCols = 6
+        presentation =  0
+
+        Ini = 50 #Just an initialization
+
+        if presentation == 0:
+            NRows = 5
+            NCols = 6
+
+        elif presentation == 1:
+            NRows = 2
+            NCols = 3
+
+        else:
+            NRows = 1
+            NCols = 1
+
+
         gs = gridspec.GridSpec(NRows, NCols, wspace=0.3, hspace=0.3)
         fig = plt.figure(figsize=(6 * NCols, 5 * NRows))
-        fig.suptitle(r"Signal rate in terms of $\sin\psi$ for $E=10^{16.0}$ eV, $\theta=30\degree$")
+        #fig.suptitle(r"Signal rate in terms of $\sin\psi$ for $E=10^{16.5}$ eV, $\theta=40\degree$")        
+        plt.rc('axes', titlesize=13)
+
 
       
         for ii in np.arange(self.nrings):
@@ -291,9 +305,9 @@ class PlotLDF(icetray.I3Module):
             ratio_to_use = self.ALL_ratio[:,:,ii][sel]
             lates_to_use = self.ALL_lates[:,:,ii][sel]
 
-            print(ratio_to_use, np.any(ratio_to_use)) 
-
             if  np.any(ratio_to_use):
+
+                xfittings = np.linspace(-1, 1, 50)
 
                 # print("Lates to use", lates_to_use.flatten())
                 #This is for the nominal slope for the data
@@ -306,6 +320,7 @@ class PlotLDF(icetray.I3Module):
 
                 # for param in bootstraping1:
                 BOOT = np.array([np.poly1d(param)(xfittings) for param in bootstraping1])
+                self.ALL_slopeserr[ii] = np.std(bootstraping1[:,0])
 
                 #Means and standard deviations from the bootstraping. These are not the means and stds from the actual data obtained from the events.
                 means_boot = np.average(BOOT, axis = 0)
@@ -328,8 +343,7 @@ class PlotLDF(icetray.I3Module):
                     means.append( np.mean(ratio_to_use[:,jj]) )
                 means = np.array(means)
 
-                # ----> Association
-                 of arms
+                # ----> Association of arms
                 
                 for jj in np.arange(7):
                     if jj<3:
@@ -355,31 +369,54 @@ class PlotLDF(icetray.I3Module):
                 chisquares_asso.append(chi_sqr_asso[0])
                 self.ALL_chisquare.append(chi_sqr_asso)
 
+                Ini = 50
+                ############################ PLOT ############################
+
+                if presentation == 0:
+                    Ini = ii
+
+                elif presentation == 1:
+
+                    if r_plot == 60:
+                        Ini = 0
+                    elif r_plot == 120:
+                        Ini = 1
+                    elif r_plot == 180:
+                        Ini = 2
+                    #elif r_plot == 300:
+                     #   Ini = 3
+                    #print("Hello", r_plot, Ini, NRows, NCols)
+
+
 
                 ####PLOT
+                if Ini != 50: #Different that the initialization
 
-                #Definition of the subplot
-                ax = fig.add_subplot(gs[ii])
+                    
+                    #Definition of the subplot
+                    ax = fig.add_subplot(gs[Ini])
 
-                #Bootstraping
-                ax.fill_between(xfittings, means_boot-stds_boot, means_boot+stds_boot, color = "k", alpha= 0.4)
+                    #Bootstraping
+                    ax.fill_between(xfittings, means_boot-stds_boot, means_boot+stds_boot, color = "k", alpha= 0.4)
 
-                #Linear fit for the data
-                ax.plot(xfittings, fit(xfittings), color='r')
+                    #Linear fit for the data
+                    ax.plot(xfittings, fit(xfittings), color='r')
 
-                #Data
-                ax.scatter(lates_to_use, ratio_to_use, c=lates_to_use, cmap='coolwarm' )
-                self.ALL_slopeserr[ii] = np.std(bootstraping1[:,0])
+                    #Data
+                    ax.scatter(lates_to_use, ratio_to_use, c=lates_to_use, cmap='coolwarm' )
+                    
+                    #Mean of data
+                    ax.scatter(lates_to_use[0,:], means, marker="x")
+                    ax.scatter(lates_means2, means2, marker="d", color="seagreen")
 
-                #Mean of data
-                ax.scatter(lates_to_use[0,:], means, marker="x")
-                ax.scatter(lates_means2, means2, marker="d", color="seagreen")
+                    #ax.set_yscale("log")
+                    plt.rc('axes', labelsize=13)
+                    #ax.set_ylim(-0.2,5)
 
-                #ax.set_yscale("log")
-                ax.set_xlabel("$\\sin\\psi$")
-                ax.set_ylabel("$S/\\bar{S}$")
-                ax.set_title(r"r= {0} m, $\chi^2$={1}.".format( r_plot, np.round(chi_sqr_asso[0],3) ))      
-        
+                    ax.set_xlabel("$\\sin\\psi$")
+                    ax.set_ylabel("$S/\\bar{S}$")
+                    ax.set_title(r"r= {0} m, $\chi^2$={1}, slope={2}.".format( r_plot, np.round(chi_sqr_asso[0],3), np.round(self.ALL_slopes[ii],3) ))      
+                
         self.ALL_chisquare = np.array(self.ALL_chisquare)
 
         ##Selection for the creation of the subarrays
@@ -419,22 +456,22 @@ class PlotLDF(icetray.I3Module):
 
         #Plot of amplitudes vs radius
 
-
+        if presentation == 0 or presentation ==2:
         
-        ax = fig.add_subplot(gs[29])
+            ax = fig.add_subplot(gs[NCols*NRows-1])
 
-        ax.errorbar(plot_radii, plot_slopes, plot_err,  color="k")
-        ax.tick_params(axis='both', which='both', direction='in')
-        ax.yaxis.set_ticks_position('both')
-        ax.xaxis.set_ticks_position('both')
+            ax.errorbar(plot_radii, plot_slopes, plot_err,  color="k")
+            ax.tick_params(axis='both', which='both', direction='in')
+            ax.yaxis.set_ticks_position('both')
+            ax.xaxis.set_ticks_position('both')
 
-        ax.scatter(plot_radii, plot_slopes, color="steelblue")
-        ax.plot(rfittings,fit_slope, label = 'fit', color ='purple' )
+            ax.scatter(plot_radii, plot_slopes, color="steelblue")
+            ax.plot(rfittings,fit_slope, label = 'fit', color ='purple' )
 
-        #ax.set_yscale("log")
-        ax.set_xlabel("Radius [m]")
-        ax.set_ylabel("Slope")
-        ax.set_title("Slope in terms of the radius")
+            #ax.set_yscale("log")
+            ax.set_xlabel("Radius [m]")
+            ax.set_ylabel("Slope")
+            ax.set_title(r"Slope in terms of the radius for $E=10^{16.0}$ eV, $\theta=30\degree$")
 
         #Uncomment print("Saving plot as", args.output)
         fig.savefig(args.output, bbox_inches="tight")

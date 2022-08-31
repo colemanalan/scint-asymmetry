@@ -23,21 +23,33 @@ Zen = data[:,0]
 A = data[:,1]
 B = data[:,2]
 C = data[:,3]
+print(Zen, A, B, C)
 
-print("done")
+minimum = np.amin([np.amin(A),np.amin(C),np.amin(C)])
+
+A= A + np.abs(minimum)
+B= B + np.abs(minimum)
+C= C + np.abs(minimum)
+
+print(minimum)
+print(A,B,C)
+
+
 
 fig = plt.figure(figsize=(6 , 5 ))
 
-plt.scatter(Zen, B)
-plt.scatter(Zen, C)
-plt.scatter(Zen, A, color="blue")
-fig.set_yscale("log")
+plt.scatter(Zen, B, color="darkgoldenrod", alpha = 0.8)
+plt.scatter(Zen, C, color= "darkslategrey", alpha=0.9)
+plt.scatter(Zen, A, color="mediumpurple", alpha=0.7)
 
-print("done")
-
+plt.legend([r"$A$",r"$B$",r"$C$"])
 plt.grid()
-plt.xlabel("Depth")
-plt.ylabel("Number of particles")
+plt.xlabel(r"Zenith angle $\theta$ ")
+plt.ylabel("Parameter")
+plt.yscale("log")
+plt.title(r"Parameters of the fitting in terms of the zenith angle for $E=10^{16.0}$ eV")
+
+#Can not use log scale since some parameters are negative.
 
 
 
